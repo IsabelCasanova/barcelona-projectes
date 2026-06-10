@@ -82,15 +82,16 @@ header{
 .spill.on{border-color:var(--gold);background:var(--gold);color:#000;font-weight:600;}
 
 .cpill{
-  display:inline-flex;align-items:center;gap:4px;
+  display:inline-flex;align-items:center;gap:5px;
   border:1.5px solid var(--border);border-radius:30px;
-  background:var(--surface);padding:5px 12px;
+  background:var(--surface);padding:5px 13px;
   font-size:11px;font-weight:500;cursor:pointer;
-  white-space:nowrap;transition:all .15s;flex-shrink:0;
-  color:var(--text2);opacity:.5;
+  white-space:nowrap;transition:all .18s;flex-shrink:0;
+  color:var(--text2);
 }
-.cpill:hover{opacity:.8;}
+.cpill:hover{border-color:var(--text2);}
 .cpill.on{opacity:1;}
+.cpill.off{opacity:.38;filter:grayscale(.6);}
 .cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 
 /* MAIN */
@@ -432,26 +433,66 @@ P.forEach(p => {
   m.addTo(map);
 });
 
+// ── STATE ─────────────────────────────────────────────────────────────────
+let actCats = new Set(CATS);
+let actStat = 'all';
+let q = '';
+let selId = null;
+
 // ── CATEGORY PILLS ─────────────────────────────────────────────────────────
 const hrow2 = document.getElementById('hrow2');
+const pillEls = {};
+
+function setPillState(b, cat, on) {
+  if (on) {
+    b.classList.add('on');
+    b.classList.remove('off');
+    b.style.borderColor = CHEX[cat] + '88';
+    b.style.background = CHEX[cat] + '18';
+  } else {
+    b.classList.remove('on');
+    b.classList.add('off');
+    b.style.borderColor = '';
+    b.style.background = '';
+  }
+}
+
 CATS.forEach(cat => {
   const b = document.createElement('button');
   b.className = 'cpill on';
   b.dataset.cat = cat;
-  b.style.borderColor = CHEX[cat] + '66';
-  b.innerHTML = `<span class="cdot" style="background:${CHEX[cat]}"></span><span style="color:${CHEX[cat]}">${cat}</span>`;
+  b.innerHTML = `<span class="cdot" style="background:${CHEX[cat]}"></span><span style="color:${CHEX[cat]};font-weight:600">${cat}</span>`;
+  setPillState(b, cat, true);
   b.addEventListener('click', () => {
-    const on = b.classList.toggle('on');
-    if (on) actCats.add(cat); else actCats.delete(cat);
+    const willBeOn = !b.classList.contains('on');
+    actCats[willBeOn ? 'add' : 'delete'](cat);
+    setPillState(b, cat, willBeOn);
     render();
   });
   hrow2.appendChild(b);
+  pillEls[cat] = b;
 });
 
-// ── STATE & FILTERS ───────────────────────────────────────────────────────────
-let actCats = new Set(CATS), actStat = 'all', q = '';
-let selId = null;
+// "Tots" reset link
+const resetBtn = document.createElement('button');
+resetBtn.className = 'spill';
+resetBtn.style.cssText = 'font-size:10px;padding:4px 10px;margin-left:4px;';
+resetBtn.textContent = '↺ Reset';
+resetBtn.addEventListener('click', () => {
+  CATS.forEach(cat => {
+    actCats.add(cat);
+    setPillState(pillEls[cat], cat, true);
+  });
+  document.querySelectorAll('.spill[data-s]').forEach(x => x.classList.remove('on'));
+  document.querySelector('.spill[data-s="all"]').classList.add('on');
+  actStat = 'all';
+  document.getElementById('srch').value = '';
+  q = '';
+  render();
+});
+hrow2.appendChild(resetBtn);
 
+// ── STATUS PILLS ──────────────────────────────────────────────────────────
 document.querySelectorAll('.spill').forEach(b => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.spill').forEach(x => x.classList.remove('on'));
@@ -461,16 +502,20 @@ document.querySelectorAll('.spill').forEach(b => {
   });
 });
 
+// ── SEARCH ────────────────────────────────────────────────────────────────
 document.getElementById('srch').addEventListener('input', e => {
-  q = e.target.value.toLowerCase();
+  q = e.target.value.toLowerCase().trim();
   render();
 });
 
+// ── VISIBILITY ────────────────────────────────────────────────────────────
 function vis(p) {
   if (!actCats.has(p.cat)) return false;
-  const s = stat(p);
-  if (actStat !== 'all' && s !== actStat) return false;
-  if (q && !p.name.toLowerCase().includes(q) && !p.desc.toLowerCase().includes(q) && !p.promotor.toLowerCase().includes(q)) return false;
+  if (actStat !== 'all' && stat(p) !== actStat) return false;
+  if (q) {
+    const haystack = (p.name + ' ' + p.desc + ' ' + p.promotor).toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
   return true;
 }
 
