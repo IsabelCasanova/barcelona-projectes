@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grans Projectes · Barcelona 2009–2035</title>
+<meta name="description" content="51 grans projectes urbans de Barcelona: mapa interactiu, inversions, estat i premsa.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script>
+function loadScript(src, cb) {
+  var s = document.createElement('script');
+  s.src = src;
+  s.onload = cb;
+  s.onerror = function() {
+    // fallback CDN
+    loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', cb);
+  };
+  document.head.appendChild(s);
+}
+</script>
+
+<style>
+:root{
+  --bg:#111827;--surface:#1f2937;--surface2:#374151;
+  --navy:#0f172a;--gold:#f4a623;--accent:#e8192c;
+  --text:#f9fafb;--text2:#9ca3af;--border:#374151;
+  --radius:10px;--shadow:0 2px 16px rgba(0,0,0,.4);
+  --c-urb:#3b82f6;--c-tra:#10b981;--c-cul:#f59e0b;
+  --c-eco:#8b5cf6;--c-dep:#ec4899;--c-sal:#ef4444;
+  --sidebar:380px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+
+/* HEADER */
+header{
+  height:110px;background:var(--navy);border-bottom:1px solid var(--border);
+  flex-shrink:0;z-index:1000;display:flex;flex-direction:column;
+}
+.hrow1{
+  display:flex;align-items:center;gap:14px;
+  padding:0 20px;height:56px;border-bottom:1px solid var(--border);
+}
+.logo{
+  font-family:'Syne',sans-serif;font-size:17px;font-weight:800;
+  color:var(--text);letter-spacing:-.01em;white-space:nowrap;flex-shrink:0;
+}
+.logo em{color:var(--gold);font-style:normal;}
+.searchbar{
+  flex:1;max-width:380px;
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:40px;padding:7px 14px;transition:border-color .18s;
+}
+.searchbar:focus-within{border-color:var(--gold);}
+.searchbar input{flex:1;border:none;background:none;outline:none;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);}
+.searchbar input::placeholder{color:var(--text2);}
+.kpis{margin-left:auto;display:flex;gap:18px;flex-shrink:0;}
+.kpi{text-align:right;}
+.kpi .n{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--gold);line-height:1;}
+.kpi .l{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;}
+
+/* FILTER ROW */
+.hrow2{
+  display:flex;align-items:center;gap:5px;
+  padding:0 16px;height:52px;overflow-x:auto;scrollbar-width:none;
+}
+.hrow2::-webkit-scrollbar{display:none;}
+.fsep{width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 3px;}
+
+.spill{
+  display:inline-flex;align-items:center;gap:5px;
+  border:1.5px solid var(--border);border-radius:30px;
+  background:var(--surface);padding:5px 12px;
+  font-size:11px;font-weight:500;cursor:pointer;
+  white-space:nowrap;transition:all .15s;color:var(--text2);flex-shrink:0;
+}
+.spill:hover{border-color:var(--text2);color:var(--text);}
+.spill.on{border-color:var(--gold);background:var(--gold);color:#000;font-weight:600;}
+
+.cpill{
+  display:inline-flex;align-items:center;gap:4px;
+  border:1.5px solid var(--border);border-radius:30px;
+  background:var(--surface);padding:5px 12px;
+  font-size:11px;font-weight:500;cursor:pointer;
+  white-space:nowrap;transition:all .15s;flex-shrink:0;
+  color:var(--text2);opacity:.5;
+}
+.cpill:hover{opacity:.8;}
+.cpill.on{opacity:1;}
+.cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+/* MAIN */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* LEFT PANEL */
+.panel{
+  width:var(--sidebar);display:flex;flex-direction:column;
+  flex-shrink:0;background:var(--bg);overflow:hidden;
+  border-right:1px solid var(--border);
+}
+.phdr{
+  padding:10px 14px 8px;font-size:11px;font-weight:500;
+  color:var(--text2);flex-shrink:0;
+  border-bottom:1px solid var(--border);
+}
+.cards{flex:1;overflow-y:auto;padding:6px 8px 24px;}
+.cards::-webkit-scrollbar{width:3px;}
+.cards::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+.catsep{
+  display:flex;align-items:center;gap:6px;
+  padding:14px 6px 6px;
+  font-family:'Syne',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--text2);
+}
+.catsep::after{content:'';flex:1;height:1px;background:var(--border);}
+.catcnt{background:var(--surface2);color:var(--text2);border-radius:9px;padding:1px 5px;font-size:8px;font-weight:600;}
+
+/* CARD */
+.card{
+  background:var(--surface);border-radius:var(--radius);
+  padding:11px 13px;cursor:pointer;
+  border:1.5px solid transparent;
+  transition:border-color .12s,box-shadow .12s;margin-bottom:4px;
+}
+.card:hover{border-color:var(--surface2);box-shadow:0 0 0 1px var(--surface2);}
+.card.active{border-color:var(--gold);box-shadow:0 0 0 2px rgba(244,166,35,.15);}
+.ctop{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px;}
+.cname{font-size:12px;font-weight:600;line-height:1.3;color:var(--text);}
+.cinv{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--gold);white-space:nowrap;flex-shrink:0;}
+.cmeta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px;}
+.cbadge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;}
+.cstatus{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:600;padding:2px 6px;border-radius:20px;}
+.cyears{font-size:10px;color:var(--text2);}
+.cdesc{font-size:10px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+/* MAP */
+.mapwrap{flex:1;position:relative;overflow:hidden;min-width:0;}
+#map{width:100%;height:100%;}
+
+/* Leaflet overrides for dark theme */
+.leaflet-container{background:#111827 !important;}
+.leaflet-control-zoom{border:1px solid var(--border) !important;border-radius:8px !important;overflow:hidden;}
+.leaflet-control-zoom a{
+  background:var(--surface) !important;color:var(--text) !important;
+  border:none !important;border-bottom:1px solid var(--border) !important;
+  width:32px !important;height:32px !important;line-height:32px !important;
+  font-size:16px !important;
+}
+.leaflet-control-zoom a:hover{background:var(--surface2) !important;}
+.leaflet-control-attribution{background:rgba(17,24,39,.8) !important;color:var(--text2) !important;font-size:9px !important;}
+.leaflet-control-attribution a{color:var(--text2) !important;}
+
+/* Custom popup */
+.leaflet-popup-content-wrapper{
+  background:var(--surface) !important;
+  border:1px solid var(--border) !important;
+  border-radius:12px !important;
+  box-shadow:0 24px 64px rgba(0,0,0,.7) !important;
+  padding:0 !important;overflow:hidden;
+}
+.leaflet-popup-tip-container{display:none !important;}
+.leaflet-popup-content{margin:0 !important;width:300px !important;}
+.leaflet-popup-close-button{color:var(--text2) !important;font-size:18px !important;top:8px !important;right:10px !important;z-index:10;}
+.leaflet-popup-close-button:hover{color:var(--text) !important;}
+
+/* DRAWER */
+.fpop{
+  position:absolute;
+  z-index:900;
+  background:#1e293b;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;
+  padding:22px 22px 18px;
+  width:320px;
+  box-shadow:0 24px 64px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.05);
+  display:none;
+  pointer-events:all;
+  animation:popIn .18s ease;
+  max-height:calc(100% - 40px);
+  overflow-y:auto;
+}
+.fpop.open{display:block;}
+@keyframes popIn{from{opacity:0;transform:scale(.94) translateY(4px);}to{opacity:1;transform:scale(1) translateY(0);}}
+.fpop-close{
+  position:absolute;top:12px;right:12px;
+  width:26px;height:26px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
+  cursor:pointer;color:rgba(255,255,255,.5);font-size:15px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .13s;
+}
+.fpop-close:hover{background:rgba(255,255,255,.12);color:#fff;}
+.fpop-cat{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.07em;}
+.fpop-name{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;line-height:1.2;color:#f1f5f9;margin-bottom:14px;}
+.fpop-sep{height:1px;background:rgba(255,255,255,.08);margin-bottom:12px;}
+.fpop-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 11px;border-radius:6px;margin-bottom:12px;}
+.fpop-desc{font-size:12px;color:#94a3b8;line-height:1.65;margin-bottom:16px;}
+.fpop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:16px;}
+.fpop-kv .k{font-size:8px;color:#64748b;text-transform:uppercase;letter-spacing:.09em;margin-bottom:3px;}
+.fpop-kv .v{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#f1f5f9;line-height:1;}
+.fpop-kv .v.inv{color:var(--gold);}
+.fpop-kv .v.sm{font-family:'Inter',sans-serif;font-size:11px;font-weight:500;color:#cbd5e1;}
+.fpop-links{display:flex;flex-wrap:wrap;gap:6px;}
+.fpop-link{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:7px 12px;border-radius:8px;text-decoration:none;border:1px solid rgba(255,255,255,.12);color:#94a3b8;transition:all .13s;background:rgba(255,255,255,.04);}
+.fpop-link:hover{border-color:rgba(255,255,255,.25);color:#f1f5f9;background:rgba(255,255,255,.08);}
+.fpop-link.web{background:var(--gold);color:#000;border-color:var(--gold);font-weight:600;}
+.fpop-link.web:hover{background:#e09518;}
+
+/* Legend */
+.map-legend{
+  position:absolute;bottom:24px;left:14px;z-index:800;
+  background:rgba(17,24,39,.92);border:1px solid var(--border);
+  border-radius:var(--radius);padding:10px 12px;
+  backdrop-filter:blur(8px);
+}
+.mlt{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text2);margin-bottom:6px;}
+.mlr{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:10px;color:var(--text);}
+.mld{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.mlsep{height:1px;background:var(--border);margin:6px 0;}
+
+/* empty */
+.empty{display:none;flex-direction:column;align-items:center;justify-content:center;height:160px;color:var(--text2);font-size:12px;gap:6px;}
+.empty.on{display:flex;}
+
+@media(max-width:700px){
+  :root{--sidebar:100vw;}
+  .main{flex-direction:column-reverse;}
+  .mapwrap{height:50dvh;flex:none;}
+  .panel{height:50dvh;width:100%;border-right:none;}
+  .kpis{display:none;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow1">
+    <div class="logo">Grans Projectes de <em>Barcelona</em></div>
+    <div class="searchbar">
+      <span style="color:var(--text2);font-size:13px">🔍</span>
+      <input type="text" id="srch" placeholder="Cerca projecte, barri o promotor…" autocomplete="off">
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="n" id="kn">51</div><div class="l">Projectes</div></div>
+      <div class="kpi"><div class="n" id="ka">—</div><div class="l">En curs</div></div>
+      <div class="kpi"><div class="n" id="ki">—</div><div class="l">Inversió total</div></div>
+    </div>
+  </div>
+  <div class="hrow2" id="hrow2">
+    <button class="spill on" data-s="all">Tots</button>
+    <button class="spill" data-s="En Curso">🔨 En curs</button>
+    <button class="spill" data-s="Completado">✅ Completat</button>
+    <button class="spill" data-s="Futuro">🔮 Futur</button>
+    <div class="fsep"></div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="panel">
+    <div class="phdr" id="phdr">51 projectes · clica per veure detalls</div>
+    <div class="cards" id="cards">
+      <div class="empty" id="empty">😕 <span>Cap projecte coincideix</span></div>
+    </div>
+  </div>
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="map-legend">
+      <div class="mlt">Categoria</div>
+      <div class="mlr"><div class="mld" style="background:var(--c-urb)"></div>Urbanisme</div>
+      <div class="mlr"><div class="mld" style="background:var(--c-tra)"></div>Transport</div>
+      <div class="mlr"><div class="mld" style="background:var(--c-cul)"></div>Cultura</div>
+      <div class="mlr"><div class="mld" style="background:var(--c-eco)"></div>Economia</div>
+      <div class="mlr"><div class="mld" style="background:var(--c-dep)"></div>Esport</div>
+      <div class="mlr"><div class="mld" style="background:var(--c-sal)"></div>Salut</div>
+      <div class="mlsep"></div>
+      <div class="mlt">Mida = Inversió</div>
+      <div class="mlr" style="gap:8px;color:var(--text2)">
+        <div style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25)"></div><span style="font-size:9px">&lt;50M</span>
+        <div style="width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.25)"></div><span style="font-size:9px">50–300</span>
+        <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.25)"></div><span style="font-size:9px">&gt;300M</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fpop" id="fpop">
+  <button class="fpop-close" id="fpop-close">×</button>
+  <div class="fpop-cat" id="fpop-cat"></div>
+  <div class="fpop-name" id="fpop-name"></div>
+  <div class="fpop-sep"></div>
+  <div class="fpop-status" id="fpop-status"></div>
+  <div class="fpop-desc" id="fpop-desc"></div>
+  <div class="fpop-grid">
+    <div class="fpop-kv"><div class="k">INVERSIÓ</div><div class="v inv" id="fpop-inv"></div></div>
+    <div class="fpop-kv"><div class="k">PROMOTOR</div><div class="v sm" id="fpop-prom"></div></div>
+    <div class="fpop-kv"><div class="k">INICI</div><div class="v" id="fpop-ini"></div></div>
+    <div class="fpop-kv"><div class="k">FI PREVISTA</div><div class="v" id="fpop-fin"></div></div>
+  </div>
+  <div class="fpop-links" id="fpop-links"></div>
+</div>
+
+<script>
+function initMap() {
+
+const CATS=['Urbanismo','Transporte','Cultura','Economía','Deporte','Salud'];
+const CHEX={Urbanismo:'#3b82f6',Transporte:'#10b981',Cultura:'#f59e0b','Economía':'#8b5cf6',Deporte:'#ec4899',Salud:'#ef4444'};
+const CICO={Urbanismo:'🏙️',Transporte:'🚇',Cultura:'🎭','Economía':'💼',Deporte:'⚽',Salud:'🏥'};
+const SCOL={'En Curso':'rgba(16,185,129,.15)','Completado':'rgba(59,130,246,.15)','Futuro':'rgba(245,158,11,.15)'};
+const STXT={'En Curso':'#6ee7b7','Completado':'#93c5fd','Futuro':'#fcd34d'};
+const SLAB={'En Curso':'🔨 En curs','Completado':'✅ Completat','Futuro':'🔮 Futur'};
+const stat=p=>p.fin<=2024?'Completado':p.ini>2026?'Futuro':'En Curso';
+const mr=inv=>inv>=1000?22:inv>=500?17:inv>=200?13:inv>=50?9:6;
+
+const P=[
+ {id:1,name:"Superilla Eixample – Eixos Verds",inv:52,ini:2022,fin:2024,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3893,lng:2.1527,web:"https://ajuntament.barcelona.cat/superilles/es/",p1:"https://www.google.com/search?q=Superilla+Eixample+site:lavanguardia.com",p2:"https://www.google.com/search?q=Superilla+Eixample+site:ara.cat",desc:"Pacificació de Consell de Cent, Rocafort, Comte Borrell i Girona: eixos peatonals amb vegetació."},
+ {id:2,name:"Remodelació Mercat de Sant Antoni",inv:80,ini:2009,fin:2018,cat:"Urbanismo",promotor:"Mercats de Barcelona",lat:41.3795,lng:2.1600,web:"https://www.mercatdesantantoni.com/",p1:"https://www.google.com/search?q=Mercat+Sant+Antoni+site:lavanguardia.com",p2:"https://www.google.com/search?q=Mercat+Sant+Antoni+site:ara.cat",desc:"Remodelació integral del mercat icònic de l'Eixample, referent europeu de recuperació patrimonial."},
+ {id:3,name:"Reforma Avinguda Meridiana",inv:30,ini:2019,fin:2024,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.4115,lng:2.1888,web:"https://ajuntament.barcelona.cat/ecologiaurbana/es/noticia/les-obres-de-la-meridiana-finalitzen-amb-un-bulevar-de-27-km_1302985",p1:"https://www.google.com/search?q=Meridiana+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Meridiana+reforma+site:ara.cat",desc:"Transformació de l'antiga 'autopista urbana' en el tram Glòries–Felip II."},
+ {id:4,name:"Urbanització Port Vell (Copa Amèrica)",inv:120,ini:2023,fin:2024,cat:"Urbanismo",promotor:"Port de Barcelona",lat:41.3754,lng:2.1818,web:"https://www.portdebarcelona.cat/es/copa-america",p1:"https://www.google.com/search?q=Copa+America+Port+Vell+site:lavanguardia.com",p2:"https://www.google.com/search?q=Copa+America+vela+site:ara.cat",desc:"Transformació del Front Marítim per acollir la Copa Amèrica de Vela 2024."},
+ {id:5,name:"Reforma Integral del Port Olímpic",inv:100,ini:2020,fin:2024,cat:"Urbanismo",promotor:"BSM / Ajuntament",lat:41.3877,lng:2.1983,web:"https://portolimpic.barcelona/es/reforma-port-olimpic/",p1:"https://www.google.com/search?q=Port+Olimpic+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Port+Olimpic+reforma+site:elperiodico.com",desc:"Transformació del port esportiu per obrir-lo a la ciutadania i enfocar-lo a l'economia blava."},
+ {id:6,name:"Reforma Moll de Pescadors",inv:22,ini:2023,fin:2026,cat:"Urbanismo",promotor:"Port de Barcelona",lat:41.3762,lng:2.1802,web:"https://www.portdebarcelona.cat/",p1:"https://www.google.com/search?q=Moll+Pescadors+site:lavanguardia.com",p2:"https://www.google.com/search?q=Moll+Pescadors+site:elperiodico.com",desc:"Nova llotja transparent, restaurants i passera elevada sobre el port."},
+ {id:7,name:"Reforma Passeig Marítim",inv:15,ini:2024,fin:2026,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3870,lng:2.2020,web:"https://ajuntament.barcelona.cat/ecologiaurbana/es/noticia/el-passeig-maritim-canvia-de-cara_1242699",p1:"https://www.google.com/search?q=Passeig+Maritim+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Passeig+Maritim+site:beteve.cat",desc:"Reurbanització des del Port Olímpic fins al Fòrum: zones peatonals i accessos a les platges."},
+ {id:8,name:"Cobertura Gran Via (Glòries–Bilbao)",inv:32,ini:2023,fin:2026,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3990,lng:2.2010,web:"https://ajuntament.barcelona.cat/ecologiaurbana/es/noticia/el-cobriment-de-la-gran-via-entre-badajoz-i-bilbao_1283752",p1:"https://www.google.com/search?q=cobertura+Gran+Via+Glories+site:lavanguardia.com",p2:"https://www.google.com/search?q=cobriment+Gran+Via+site:ara.cat",desc:"9 ha de parc lineal i 1.000 arbres nous entre Badajoz i Bilbao."},
+ {id:9,name:"Transformació de les Glòries (Canòpia)",inv:150,ini:2014,fin:2026,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3991,lng:2.1908,web:"https://ajuntament.barcelona.cat/ecologiaurbana/es/actuaciones/can%C3%B2pia-de-les-gl%C3%B2ries",p1:"https://www.google.com/search?q=Canopia+Glories+site:lavanguardia.com",p2:"https://www.google.com/search?q=Glories+parc+site:ara.cat",desc:"Conversió de l'antic nus viari en el gran parc central de Barcelona."},
+ {id:10,name:"Reforma de Via Laietana",inv:32.9,ini:2022,fin:2025,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3834,lng:2.1773,web:"https://ajuntament.barcelona.cat/ecologiaurbana/es/noticia/via-laietana-nova-via-civica_1213879",p1:"https://www.google.com/search?q=Via+Laietana+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Via+Laietana+obres+site:elperiodico.com",desc:"Via amable: voreres més amples, carril bici i restricció del trànsit."},
+ {id:11,name:"Reforma de La Rambla",inv:44.5,ini:2022,fin:2027,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3797,lng:2.1733,web:"https://ajuntament.barcelona.cat/pla-accio-govern2023-2027/es/actuacion/reforma-de-la-rambla_492",p1:"https://www.google.com/search?q=reforma+La+Rambla+site:lavanguardia.com",p2:"https://www.google.com/search?q=reforma+Rambla+site:ara.cat",desc:"Pacificació i reurbanització integral de La Rambla."},
+ {id:12,name:"La Industrial+",inv:120,ini:2024,fin:2027,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3851,lng:2.1490,web:"https://ajuntament.barcelona.cat/eixample/es/noticia/la-industrial-un-nou-espai-per-a-la-innovacio_1308456",p1:"https://www.google.com/search?q=La+Industrial+Barcelona+site:lavanguardia.com",p2:"https://www.google.com/search?q=La+Industrial+site:elperiodico.com",desc:"Recinte fabril de l'Eixample reconvertit en pol d'innovació amb palau de congressos."},
+ {id:13,name:"Transformació recinte de La Model",inv:50,ini:2024,fin:2028,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3936,lng:2.1505,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=La+Model+preso+transformacio+site:lavanguardia.com",p2:"https://www.google.com/search?q=La+Model+Barcelona+site:ara.cat",desc:"Antiga presó de l'Eixample: parc públic, habitatge assequible i institut escola."},
+ {id:14,name:"Reforma de Montjuïc",inv:80,ini:2025,fin:2030,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3641,lng:2.1527,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Montjuic+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Montjuic+reforma+site:elperiodico.com",desc:"Revitalització de la muntanya com a parc cultural i esportiu."},
+ {id:15,name:"Reforma de Plaça Espanya",inv:50,ini:2026,fin:2029,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.3754,lng:2.1488,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Placa+Espanya+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Placa+Espanya+reforma+site:elperiodico.com",desc:"Reurbanització de la rotonda connectant Gran Via, Paral·lel i Montjuïc."},
+ {id:16,name:"Reconversió Fàbrica Mercedes-Benz",inv:200,ini:2024,fin:2030,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.4371,lng:2.2020,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=fabrica+Mercedes+Benz+Bon+Pastor+site:lavanguardia.com",p2:"https://www.google.com/search?q=Mercedes+Benz+Bon+Pastor+site:elperiodico.com",desc:"Ecodistricte mixt de 9 ha a Bon Pastor: habitatge sostenible i usos universitaris."},
+ {id:17,name:"Transformació de Vallcarca",inv:15,ini:2024,fin:2030,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.4148,lng:2.1468,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Vallcarca+transformacio+site:lavanguardia.com",p2:"https://www.google.com/search?q=Vallcarca+obres+site:ara.cat",desc:"Zones verdes que reconnecten la ciutat amb Collserola."},
+ {id:18,name:"Desenvolupament 22@ Nord",inv:150,ini:2022,fin:2030,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.4055,lng:2.2028,web:"https://www.22barcelona.com/",p1:"https://www.google.com/search?q=22%40+nord+site:lavanguardia.com",p2:"https://www.google.com/search?q=22%40+nord+site:elperiodico.com",desc:"Ampliació del districte d'innovació cap al nord amb habitatge dotacional."},
+ {id:19,name:"La Sagrera – Estació Intermodal",inv:260,ini:2026,fin:2031,cat:"Urbanismo",promotor:"Ajuntament de Barcelona",lat:41.4208,lng:2.1968,web:"https://www.sagrera.cat/",p1:"https://www.google.com/search?q=Sagrera+estacio+site:lavanguardia.com",p2:"https://www.google.com/search?q=Sagrera+estacio+site:elperiodico.com",desc:"Parc lineal més gran de la ciutat i 11.000 habitatges nous."},
+ {id:20,name:"Nova Estació de Sant Andreu",inv:18,ini:2021,fin:2022,cat:"Transporte",promotor:"Adif",lat:41.4312,lng:2.1901,web:"https://www.adif.es/",p1:"https://www.google.com/search?q=estacio+Sant+Andreu+nova+site:lavanguardia.com",p2:"https://www.google.com/search?q=estacio+Sant+Andreu+site:beteve.cat",desc:"Nova estació soterrada de Sant Andreu Comtal en funcionament."},
+ {id:21,name:"Tranvia per la Diagonal (Fase 1)",inv:108,ini:2021,fin:2024,cat:"Transporte",promotor:"ATM / Ajuntament",lat:41.3993,lng:2.1638,web:"https://tram.cat/ca/xarxa/planol-de-la-xarxa/",p1:"https://www.google.com/search?q=tramvia+Diagonal+site:lavanguardia.com",p2:"https://www.google.com/search?q=tramvia+Diagonal+site:ara.cat",desc:"Primer tram completat: Glòries–Verdaguer. Base per a la connexió futura."},
+ {id:22,name:"Carril Bici Ronda del Port",inv:8,ini:2024,fin:2025,cat:"Transporte",promotor:"Port de Barcelona",lat:41.3740,lng:2.1740,web:"https://www.portdebarcelona.cat/",p1:"https://www.google.com/search?q=carril+bici+Ronda+Port+site:lavanguardia.com",p2:"https://www.google.com/search?q=carril+bici+port+site:ara.cat",desc:"3,5 km de carril bici segregat: Moll de la Fusta – Montjuïc."},
+ {id:23,name:"Reforma Estació de Sants (Vestíbuls)",inv:100,ini:2024,fin:2028,cat:"Transporte",promotor:"Adif / Ministeri de Transports",lat:41.3793,lng:2.1408,web:"https://www.adif.es/",p1:"https://www.google.com/search?q=estacio+Sants+reforma+site:lavanguardia.com",p2:"https://www.google.com/search?q=Sants+obres+site:elperiodico.com",desc:"Modernització: vestíbuls, accessibilitat i intermodalitat."},
+ {id:24,name:"Connexió Tramvia per la Diagonal",inv:115,ini:2021,fin:2028,cat:"Transporte",promotor:"ATM / Ajuntament",lat:41.3912,lng:2.1392,web:"https://tram.cat/ca/projectes/connexio-tramvia-diagonal/",p1:"https://www.google.com/search?q=connexio+tramvia+Diagonal+site:lavanguardia.com",p2:"https://www.google.com/search?q=tramvia+Diagonal+site:elperiodico.com",desc:"Unió de Trambaix i Trambesòs a través de la Diagonal."},
+ {id:25,name:"Prolongació L8 FGC (Espanya–Gràcia)",inv:400,ini:2024,fin:2030,cat:"Transporte",promotor:"Generalitat / FGC",lat:41.3755,lng:2.1497,web:"https://www.fgc.cat/ca/fgc/projectes-infraestructura/prolongacio-linia-barcelona-valles/",p1:"https://www.google.com/search?q=L8+FGC+prolongacio+site:lavanguardia.com",p2:"https://www.google.com/search?q=L8+FGC+prolongacio+site:elperiodico.com",desc:"4 km de túnel i 3 noves estacions: Hospital Clínic, Francesc Macià, Gràcia."},
+ {id:26,name:"Ampliació Gran Estació de Sants",inv:410,ini:2024,fin:2030,cat:"Transporte",promotor:"Adif / Ministeri de Transports",lat:41.3791,lng:2.1402,web:"https://www.adif.es/",p1:"https://www.google.com/search?q=ampliacio+Gran+Estacio+Sants+site:lavanguardia.com",p2:"https://www.google.com/search?q=Sants+ampliacio+site:elperiodico.com",desc:"Ampliació de l'estació central i cosit dels barris veïns."},
+ {id:27,name:"Nous accessos al Port de Barcelona",inv:600,ini:2025,fin:2030,cat:"Transporte",promotor:"Port de Barcelona",lat:41.3498,lng:2.1652,web:"https://www.portdebarcelona.cat/es/infraestructura/accesos-terrestres",p1:"https://www.google.com/search?q=nous+accessos+port+Barcelona+site:lavanguardia.com",p2:"https://www.google.com/search?q=accessos+port+site:expansion.com",desc:"Infraestructures exclusives per a mercaderies, descongestionant Rodalies."},
+ {id:28,name:"Tronc Central L9/L10 Metro",inv:1600,ini:2010,fin:2027,cat:"Transporte",promotor:"ATM / Generalitat",lat:41.3858,lng:2.1686,web:"https://www.atm.cat/web/ca/projectes/projectes-en-curs/tronc-central-l9-l10.php",p1:"https://www.google.com/search?q=tronc+central+L9+L10+metro+site:lavanguardia.com",p2:"https://metropoliabierta.elespanol.com/vivir-en-barcelona/20251211/futura-l9-metro-barcelona-obras-completamente-operativa/1003742715078_0.html",desc:"Última fase del metro L9/L10: 4 noves estacions previstes per al 2027."},
+ {id:29,name:"Prolongació L2 a Montjuïc",inv:400,ini:2027,fin:2032,cat:"Transporte",promotor:"ATM / Generalitat",lat:41.3720,lng:2.1580,web:"https://www.atm.cat/",p1:"https://www.google.com/search?q=prolongacio+L2+Montjuic+site:lavanguardia.com",p2:"https://www.google.com/search?q=metro+L2+Montjuic+site:elperiodico.com",desc:"Metro L2 des de Sant Antoni fins al Parc Logístic passant per Montjuïc."},
+ {id:30,name:"Ampliació Aeroport El Prat",inv:1700,ini:2026,fin:2031,cat:"Transporte",promotor:"AENA",lat:41.2974,lng:2.0833,web:"https://www.aena.es/es/aeropuerto-barcelona/ampliacion.html",p1:"https://www.google.com/search?q=ampliacio+aeroport+El+Prat+site:lavanguardia.com",p2:"https://www.google.com/search?q=aeroport+Prat+La+Ricarda+site:ara.cat",desc:"Tercera pista per convertir l'aeroport en hub intercontinental."},
+ {id:31,name:"CaixaResearch Institute",inv:60,ini:2022,fin:2025,cat:"Cultura",promotor:"Fundació 'la Caixa'",lat:41.4145,lng:2.1757,web:"https://fundacionlacaixa.org/",p1:"https://www.google.com/search?q=CaixaResearch+Institute+site:lavanguardia.com",p2:"https://www.google.com/search?q=CaixaResearch+site:elperiodico.com",desc:"Primer centre de recerca en immunologia d'Espanya, a l'Hospital de Sant Pau."},
+ {id:32,name:"Teatre Arnau Cinema",inv:10,ini:2024,fin:2026,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3762,lng:2.1623,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Teatre+Arnau+Parallel+site:lavanguardia.com",p2:"https://www.google.com/search?q=Teatre+Arnau+site:ara.cat",desc:"Rehabilitació de l'últim teatre de barraca del Paral·lel."},
+ {id:33,name:"Reforma de la Foneria de Canons",inv:12,ini:2024,fin:2026,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3792,lng:2.1742,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Foneria+Canons+Rambla+site:lavanguardia.com",p2:"https://www.google.com/search?q=Foneria+Canons+site:elperiodico.com",desc:"Edifici del s. XVII a La Rambla reconvertit en centre de cultura digital."},
+ {id:34,name:"Barcelona Mar de Ciència",inv:7,ini:2024,fin:2026,cat:"Cultura",promotor:"CSIC",lat:41.3891,lng:2.1974,web:"https://www.csic.es/",p1:"https://www.google.com/search?q=Barcelona+Mar+Ciencia+CSIC+site:lavanguardia.com",p2:"https://www.google.com/search?q=Mar+Ciencia+Barcelona+site:beteve.cat",desc:"Pol de divulgació científica marina al Port Olímpic."},
+ {id:35,name:"Recuperació del Teatre Capitol",inv:15,ini:2025,fin:2027,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3803,lng:2.1699,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Teatre+Capitol+Rambla+site:lavanguardia.com",p2:"https://www.google.com/search?q=Teatre+Capitol+site:elperiodico.com",desc:"Teatre de La Rambla rehabilitat com a espai escènic de petit format."},
+ {id:36,name:"Reforma del Teatre Principal",inv:25,ini:2024,fin:2027,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3806,lng:2.1726,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Teatre+Principal+art+digital+site:lavanguardia.com",p2:"https://www.google.com/search?q=Teatre+Principal+site:elperiodico.com",desc:"Teatre Principal transformat en centre d'art digital immersiu."},
+ {id:37,name:"Ampliació MACBA",inv:16,ini:2024,fin:2027,cat:"Cultura",promotor:"Consorci Generalitat/Ajunt.",lat:41.3828,lng:2.1661,web:"https://www.macba.cat/ca/el-museu/sobre-el-macba/projecte-ampliacio",p1:"https://www.google.com/search?q=MACBA+ampliacio+site:lavanguardia.com",p2:"https://www.google.com/search?q=MACBA+ampliacio+site:ara.cat",desc:"Nou edifici de 3.000 m² a la plaça dels Àngels (Christ & Gantenbein)."},
+ {id:38,name:"Ampliació PRBB",inv:30,ini:2025,fin:2028,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3845,lng:2.1963,web:"https://www.prbb.org/",p1:"https://www.google.com/search?q=PRBB+ampliacio+site:lavanguardia.com",p2:"https://www.google.com/search?q=Parc+Recerca+Biomedica+site:elperiodico.com",desc:"Nou edifici de 10.000 m² per a recerca biomèdica i bioinformàtica."},
+ {id:39,name:"Liceu Mar",inv:40,ini:2025,fin:2028,cat:"Cultura",promotor:"Fundació Gran Teatre del Liceu",lat:41.3760,lng:2.1800,web:"https://www.liceubarcelona.cat/",p1:"https://www.google.com/search?q=Liceu+Mar+Port+Vell+site:lavanguardia.com",p2:"https://www.google.com/search?q=Liceu+Mar+site:ara.cat",desc:"Segona seu del Liceu al Port Vell, dedicada a la creació contemporània."},
+ {id:40,name:"Museo Thyssen Barcelona",inv:35,ini:2025,fin:2028,cat:"Cultura",promotor:"Consorci Generalitat/Ajunt.",lat:41.3691,lng:2.1534,web:"https://www.museothyssen.org/",p1:"https://www.google.com/search?q=Thyssen+Barcelona+Montjuic+site:lavanguardia.com",p2:"https://www.google.com/search?q=Thyssen+Barcelona+site:ara.cat",desc:"Nova seu de la col·lecció Carmen Thyssen al pavelló Victoria Eugenia de Montjuïc."},
+ {id:41,name:"Parc Científic de Barcelona",inv:50,ini:2025,fin:2029,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3855,lng:2.1170,web:"https://www.pcb.ub.cat/",p1:"https://www.google.com/search?q=Parc+Cientific+Barcelona+site:lavanguardia.com",p2:"https://www.google.com/search?q=Parc+Cientific+site:viaempresa.cat",desc:"Expansió del PCB per a noves empreses biotech i centres d'innovació."},
+ {id:42,name:"Biblioteca Pública del Estado",inv:80,ini:2025,fin:2030,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3832,lng:2.1857,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Biblioteca+Publica+Estat+Barcelona+site:lavanguardia.com",p2:"https://www.google.com/search?q=biblioteca+publica+Barcelona+site:elperiodico.com",desc:"Nova biblioteca central de Barcelona prop de l'Estació de França."},
+ {id:43,name:"Catalunya Media City (Tres Xemeneies)",inv:70.8,ini:2026,fin:2028,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.4120,lng:2.2198,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Catalunya+Media+City+Tres+Xemeneies+site:lavanguardia.com",p2:"https://www.google.com/search?q=Tres+Xemeneies+audiovisual+site:viaempresa.cat",desc:"Gran centre audiovisual de Catalunya a la sala de turbines de Sant Adrià."},
+ {id:44,name:"Ciutadella del Coneixement",inv:433,ini:2024,fin:2030,cat:"Cultura",promotor:"Ajuntament de Barcelona",lat:41.3888,lng:2.1993,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Ciutadella+Coneixement+site:lavanguardia.com",p2:"https://www.google.com/search?q=Ciutadella+Coneixement+site:elperiodico.com",desc:"Pol de recerca biomèdica als terrenys del Mercat del Peix: UPF, PRBB i biociències."},
+ {id:45,name:"BlueTechPort",inv:142,ini:2023,fin:2028,cat:"Economía",promotor:"Port de Barcelona",lat:41.3589,lng:2.1705,web:"https://www.portdebarcelona.cat/es/economia-azul/bluetechport",p1:"https://www.google.com/search?q=BlueTechPort+port+Barcelona+site:lavanguardia.com",p2:"https://www.google.com/search?q=BlueTechPort+site:expansion.com",desc:"Hub d'economia blava al Moll de Sant Bertran: 2.500 professionals."},
+ {id:46,name:"Hall 0 Fira de Barcelona",inv:70,ini:2024,fin:2027,cat:"Economía",promotor:"Fira de Barcelona",lat:41.3705,lng:2.1479,web:"https://www.firabarcelona.com/ca/la-fira/infraestructures/hall-0/",p1:"https://www.google.com/search?q=Hall+0+Fira+Barcelona+site:lavanguardia.com",p2:"https://www.google.com/search?q=Hall+0+Fira+site:expansion.com",desc:"Nou pavelló de 60.000 m² a Montjuïc que situa la Fira en l'elit ferial."},
+ {id:47,name:"Parc de Tecnologia Marítima",inv:56,ini:2025,fin:2028,cat:"Economía",promotor:"Ajuntament de Barcelona",lat:41.3721,lng:2.1878,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Parc+Tecnologia+Maritima+site:lavanguardia.com",p2:"https://www.google.com/search?q=Parc+Tecnologia+Maritima+site:elperiodico.com",desc:"Edifici de 16.500 m² prop de l'Hotel W: labs d'hidrodinàmica i startups."},
+ {id:48,name:"22@ Digital Economy Hub",inv:150,ini:2022,fin:2030,cat:"Economía",promotor:"Ajuntament de Barcelona",lat:41.4035,lng:2.2050,web:"https://www.22barcelona.com/",p1:"https://www.google.com/search?q=22%40+Barcelona+economia+digital+site:lavanguardia.com",p2:"https://www.google.com/search?q=22%40+site:viaempresa.cat",desc:"Economia digital i ciències al 22@ Nord amb habitatge dotacional."},
+ {id:49,name:"Estadi Olímpic Lluís Companys",inv:20,ini:2023,fin:2024,cat:"Deporte",promotor:"Ajuntament de Barcelona",lat:41.3645,lng:2.1575,web:"https://ajuntament.barcelona.cat/",p1:"https://www.google.com/search?q=Estadi+Olimpic+Companys+site:lavanguardia.com",p2:"https://www.google.com/search?q=Estadi+Olimpic+Barca+site:mundodeportivo.com",desc:"Seu temporal del FC Barcelona durant les obres del Camp Nou."},
+ {id:50,name:"Camp Nou – Espai Barça",inv:1500,ini:2023,fin:2026,cat:"Deporte",promotor:"FC Barcelona",lat:41.3809,lng:2.1228,web:"https://www.fcbarcelona.es/es/club/espai-barca",p1:"https://cronicaglobal.elespanol.com/culemania/palco/20260209/espai-barca-spotify-camp-nou-palau-blaugrana/1003742730688_0.html",p2:"https://www.google.com/search?q=Camp+Nou+obres+Espai+Barca+site:mundodeportivo.com",desc:"105.000 espectadors, nou Palau Blaugrana i reurbanització de l'entorn."},
+ {id:51,name:"Nou Clínic – Campus Diagonal",inv:135,ini:2030,fin:2035,cat:"Salud",promotor:"Generalitat / Hospital Clínic",lat:41.3910,lng:2.1350,web:"https://www.clinicbarcelona.org/el-clinic/projectes/nou-clinic",p1:"https://www.google.com/search?q=Nou+Clinic+campus+Diagonal+site:lavanguardia.com",p2:"https://www.google.com/search?q=Hospital+Clinic+nou+campus+site:elperiodico.com",desc:"Nou campus hospitalari de 10 ha a la Diagonal amb nova parada de metro (L3)."},
+];
+
+// ── INIT LEAFLET MAP ──────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [41.385, 2.173],
+  zoom: 13,
+  zoomControl: true,
+  zoomAnimation: true,
+});
+
+// CartoDB dark tiles
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── MARKERS ───────────────────────────────────────────────────────────────────
+const mEls = {};
+
+function makeMarker(p) {
+  const r = mr(p.inv);
+  const col = CHEX[p.cat] || '#888';
+  const s = stat(p);
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${r*2}px;height:${r*2}px;border-radius:50%;
+      background:${col};border:2px solid rgba(255,255,255,0.8);
+      box-shadow:0 0 0 3px rgba(0,0,0,0.3),0 3px 12px rgba(0,0,0,0.5);
+      cursor:pointer;transition:transform .15s,box-shadow .15s;
+      ${s==='En Curso'?`animation:pulse_${p.id} 2.5s ease-in-out infinite;`:''}
+    "></div>
+    ${s==='En Curso'?`<style>
+      @keyframes pulse_${p.id}{
+        0%,100%{box-shadow:0 0 0 0 ${col}55,0 3px 12px rgba(0,0,0,0.5);}
+        50%{box-shadow:0 0 0 8px ${col}00,0 3px 12px rgba(0,0,0,0.5);}
+      }
+    </style>`:''}`,
+    iconSize: [r*2, r*2],
+    iconAnchor: [r, r],
+  });
+
+  const m = L.marker([p.lat, p.lng], { icon });
+
+  m.on('mouseover', () => {
+    const el = m.getElement();
+    if (el) el.querySelector('div').style.transform = 'scale(1.2)';
+  });
+  m.on('mouseout', () => {
+    const el = m.getElement();
+    if (el) el.querySelector('div').style.transform = 'scale(1)';
+  });
+  m.on('click', (e) => { pick(p.id); openPopup(p, e.latlng); L.DomEvent.stopPropagation(e); });
+
+  return m;
+}
+
+P.forEach(p => {
+  const m = makeMarker(p);
+  mEls[p.id] = { marker: m, visible: true };
+  m.addTo(map);
+});
+
+// ── CATEGORY PILLS ─────────────────────────────────────────────────────────
+const hrow2 = document.getElementById('hrow2');
+CATS.forEach(cat => {
+  const b = document.createElement('button');
+  b.className = 'cpill on';
+  b.dataset.cat = cat;
+  b.style.borderColor = CHEX[cat] + '66';
+  b.innerHTML = `<span class="cdot" style="background:${CHEX[cat]}"></span><span style="color:${CHEX[cat]}">${cat}</span>`;
+  b.addEventListener('click', () => {
+    const on = b.classList.toggle('on');
+    if (on) actCats.add(cat); else actCats.delete(cat);
+    render();
+  });
+  hrow2.appendChild(b);
+});
+
+// ── STATE & FILTERS ───────────────────────────────────────────────────────────
+let actCats = new Set(CATS), actStat = 'all', q = '';
+let selId = null;
+
+document.querySelectorAll('.spill').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.spill').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    actStat = b.dataset.s;
+    render();
+  });
+});
+
+document.getElementById('srch').addEventListener('input', e => {
+  q = e.target.value.toLowerCase();
+  render();
+});
+
+function vis(p) {
+  if (!actCats.has(p.cat)) return false;
+  const s = stat(p);
+  if (actStat !== 'all' && s !== actStat) return false;
+  if (q && !p.name.toLowerCase().includes(q) && !p.desc.toLowerCase().includes(q) && !p.promotor.toLowerCase().includes(q)) return false;
+  return true;
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function render() {
+  let cnt = 0, inv = 0, act = 0;
+
+  P.forEach(p => {
+    const v = vis(p);
+    const { marker } = mEls[p.id];
+    if (v && !map.hasLayer(marker)) marker.addTo(map);
+    else if (!v && map.hasLayer(marker)) map.removeLayer(marker);
+    if (v) { cnt++; inv += p.inv; if (stat(p) === 'En Curso') act++; }
+  });
+
+  document.getElementById('kn').textContent = cnt;
+  document.getElementById('ka').textContent = act;
+  document.getElementById('ki').textContent = inv >= 1000 ? (inv/1000).toFixed(1)+'B€' : Math.round(inv)+'M€';
+
+  const cards = document.getElementById('cards');
+  cards.innerHTML = '';
+  const empty = document.createElement('div');
+  empty.className = 'empty';
+  empty.innerHTML = '😕 <span>Cap projecte coincideix</span>';
+  cards.appendChild(empty);
+
+  const visible = P.filter(vis);
+  document.getElementById('phdr').textContent = `${visible.length} projecte${visible.length !== 1 ? 's' : ''} · clica per veure detalls`;
+
+  if (!visible.length) { empty.classList.add('on'); return; }
+
+  const bycat = {};
+  CATS.forEach(c => bycat[c] = []);
+  visible.forEach(p => { if (bycat[p.cat]) bycat[p.cat].push(p); });
+
+  CATS.forEach(cat => {
+    const ps = bycat[cat].sort((a, b) => a.fin - b.fin);
+    if (!ps.length) return;
+
+    const sep = document.createElement('div');
+    sep.className = 'catsep';
+    sep.innerHTML = `<span style="color:${CHEX[cat]}">${CICO[cat]}</span><span style="color:${CHEX[cat]}">${cat}</span><span class="catcnt">${ps.length}</span>`;
+    cards.appendChild(sep);
+
+    ps.forEach(p => {
+      const s = stat(p), col = CHEX[p.cat];
+      const card = document.createElement('div');
+      card.className = 'card' + (p.id === selId ? ' active' : '');
+      card.dataset.id = p.id;
+      card.innerHTML = `
+        <div class="ctop">
+          <div class="cname">${p.name}</div>
+          <div class="cinv">${p.inv >= 1000 ? (p.inv/1000).toFixed(1)+'B' : p.inv.toLocaleString('ca')}M€</div>
+        </div>
+        <div class="cmeta">
+          <span class="cbadge" style="background:${col}20;color:${col}">${CICO[cat]} ${cat}</span>
+          <span class="cstatus" style="background:${SCOL[s]};color:${STXT[s]}">${SLAB[s]}</span>
+          <span class="cyears">${p.ini}–${p.fin}</span>
+        </div>
+        <div class="cdesc">${p.desc}</div>`;
+      card.addEventListener('click', () => {
+        pick(p.id);
+        const latlng = L.latLng(p.lat, p.lng);
+        map.flyTo(latlng, Math.max(map.getZoom(), 15), { duration: 0.8 });
+        setTimeout(() => openPopup(p, latlng), 400);
+      });
+      cards.appendChild(card);
+    });
+  });
+}
+
+// ── SELECT & PAN ──────────────────────────────────────────────────────────
+function pick(id) {
+  selId = id;
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('active', parseInt(c.dataset.id) === id));
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── FLOATING POPUP ────────────────────────────────────────────────────────
+const fpop = document.getElementById('fpop');
+const mapwrapEl = document.querySelector('.mapwrap');
+
+function openPopup(p, latlng) {
+  const s = stat(p), col = CHEX[p.cat];
+
+  const catEl = document.getElementById('fpop-cat');
+  catEl.textContent = `${CICO[p.cat]} ${p.cat}`;
+  catEl.style.cssText = `background:${col}25;color:${col};display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.07em`;
+
+  document.getElementById('fpop-name').textContent = p.name;
+
+  const stEl = document.getElementById('fpop-status');
+  stEl.textContent = SLAB[s];
+  stEl.style.cssText = `background:${SCOL[s]};color:${STXT[s]};display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 11px;border-radius:6px;margin-bottom:12px`;
+
+  document.getElementById('fpop-desc').textContent = p.desc;
+  document.getElementById('fpop-inv').textContent = (p.inv >= 1000 ? (p.inv/1000).toFixed(1)+'B' : p.inv.toLocaleString('ca')) + 'M€';
+  document.getElementById('fpop-ini').textContent = p.ini;
+  document.getElementById('fpop-fin').textContent = p.fin;
+  document.getElementById('fpop-prom').textContent = p.promotor;
+  document.getElementById('fpop-links').innerHTML = `
+    ${p.web ? `<a class="fpop-link web" href="${p.web}" target="_blank">🌐 Web oficial</a>` : ''}
+    ${p.p1 ? `<a class="fpop-link" href="${p.p1}" target="_blank">🔍 La Vanguardia</a>` : ''}
+    ${p.p2 ? `<a class="fpop-link" href="${p.p2}" target="_blank">🔍 El Periódico / Ara</a>` : ''}
+  `;
+
+  // Position popup near the clicked point on screen
+  const point = map.latLngToContainerPoint(latlng);
+  const mRect = mapwrapEl.getBoundingClientRect();
+  const pw = 320, ph = 420;
+  const margin = 12;
+
+  let left = point.x + 16;
+  let top = point.y - ph / 2;
+
+  // Flip left if too close to right edge
+  if (left + pw > mRect.width - margin) left = point.x - pw - 16;
+  // Clamp vertically
+  top = Math.max(margin, Math.min(top, mRect.height - ph - margin));
+
+  fpop.style.left = left + 'px';
+  fpop.style.top = top + 'px';
+  fpop.classList.add('open');
+}
+
+function closePopup() { fpop.classList.remove('open'); }
+document.getElementById('fpop-close').onclick = closePopup;
+map.on('click', closePopup);
+
+render();
+
+}
+loadScript('https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', function() {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMap);
+  } else {
+    initMap();
+  }
+});
+</script>
+</body>
+</html>
